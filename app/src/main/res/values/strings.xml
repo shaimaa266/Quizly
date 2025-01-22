@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="next">Next</string>
+    <string name="start">Start</string>
+    <string name="player_name">Player Name</string>
+    <string name="score_0">Score: 0</string>
+</resources>
