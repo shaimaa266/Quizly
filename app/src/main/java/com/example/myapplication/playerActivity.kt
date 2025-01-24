@@ -74,10 +74,10 @@ class PlayerActivity : AppCompatActivity() {
         ) { result ->
             val name = playerName.text.toString()
             if (result.resultCode == RESULT_OK && name.isNotEmpty()) {
-                val score = result.data?.getIntExtra("score", 0) ?: 0 // Get the correct score
-                lastPlayerScore = score // Save it to lastPlayerScore
+                val score = result.data?.getIntExtra("score", 0) ?: 0
+                lastPlayerScore = score
                 val player = players[name] ?: Player(name)
-                player.score = score // Update the player's score
+                player.score = score
                 player.backPressedCount = 0
                 player.isRestricted = false
                 players[name] = player

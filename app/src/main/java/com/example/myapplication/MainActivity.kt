@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -136,23 +137,38 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private var hasSavedScore = false
+
     private fun saveWinnerToPreferences() {
-        if (score == 0) return // Do not save players with 0 score
+        if (score == 0 || hasSavedScore) return// Prevent saving twice in the same session
 
         val sharedPreferences = getSharedPreferences("GameWinners", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
         val winnersJson = sharedPreferences.getString("winners", "[]")
         val winnersArray = JSONArray(winnersJson)
 
-        // Avoid duplicate entries for the same player
-        val existingWinner = (0 until winnersArray.length()).any { i ->
-            winnersArray.getJSONObject(i).getString("name") == currentPlayer.name
+        var existingWinnerIndex = -1
+        for (i in 0 until winnersArray.length()) {
+            val winner = winnersArray.getJSONObject(i)
+            if (winner.getString("name") == currentPlayer.name) {
+                existingWinnerIndex = i
+                break
+            }
         }
 
-        if (!existingWinner) {
+        if (existingWinnerIndex != -1) {
+
+            val existingWinner = winnersArray.getJSONObject(existingWinnerIndex)
+            val existingScore = existingWinner.getInt("score")
+            if (score > existingScore) {
+                existingWinner.put("score", score) // Update the score
+                winnersArray.put(existingWinnerIndex, existingWinner)
+            }
+        } else {
+            // Add a new winner if they don't exist
             val newWinner = JSONObject().apply {
                 put("name", currentPlayer.name)
-                put("score", score) // Use the correct score variable
+                put("score", score)
             }
             winnersArray.put(newWinner)
         }
@@ -160,8 +176,11 @@ class MainActivity : AppCompatActivity() {
         editor.putString("winners", winnersArray.toString())
         editor.apply()
 
+        hasSavedScore = true // Mark the score as saved
         Toast.makeText(this, "Saved ${currentPlayer.name} with score $score!", Toast.LENGTH_SHORT).show()
     }
+
+
 
 
 

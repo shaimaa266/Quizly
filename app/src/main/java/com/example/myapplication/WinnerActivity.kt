@@ -39,18 +39,20 @@ class WinnerActivity : AppCompatActivity() {
         val winnersJson = sharedPreferences.getString("winners", "[]")
         val winnersArray = JSONArray(winnersJson)
 
-        val winnersList = ArrayList<Player>()
+        val winnersMap = mutableMapOf<String, Player>() // Use a map to prevent duplicates
         for (i in 0 until winnersArray.length()) {
             val winner = winnersArray.getJSONObject(i)
             val name = winner.getString("name")
             val score = winner.getInt("score")
-            winnersList.add(Player(name, score = score))
+            if (!winnersMap.containsKey(name) || winnersMap[name]!!.score < score) {
+                winnersMap[name] = Player(name, score = score)
+            }
         }
 
-        // Sort by descending scores
-        winnersList.sortByDescending { it.score }
-        return winnersList
+        // Convert the map values to a sorted list
+        return ArrayList(winnersMap.values.sortedByDescending { it.score })
     }
+
 
 
 }
