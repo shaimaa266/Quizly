@@ -29,23 +29,28 @@ class WinnerActivity : AppCompatActivity() {
         recyclerView.layoutManager = LinearLayoutManager(this)
 
         val winnersList = loadWinners()
+
+
         adapter = PlayersAdapter(winnersList)
         recyclerView.adapter = adapter
     }
-
-    private fun loadWinners(): ArrayList<players> {
+    private fun loadWinners(): ArrayList<Player> {
         val sharedPreferences = getSharedPreferences("GameWinners", Context.MODE_PRIVATE)
         val winnersJson = sharedPreferences.getString("winners", "[]")
         val winnersArray = JSONArray(winnersJson)
 
-        val winnersList = ArrayList<players>()
+        val winnersList = ArrayList<Player>()
         for (i in 0 until winnersArray.length()) {
             val winner = winnersArray.getJSONObject(i)
             val name = winner.getString("name")
             val score = winner.getInt("score")
-            winnersList.add(players(name, score))
+            winnersList.add(Player(name, score = score))
         }
+
+        // Sort by descending scores
+        winnersList.sortByDescending { it.score }
         return winnersList
     }
+
 
 }

@@ -1,9 +1,9 @@
 package com.example.myapplication
 
-import android.annotation.SuppressLint
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
@@ -19,7 +19,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class PlayerActivity : AppCompatActivity() {
-    private val playerAttempts = mutableMapOf<String, Int>()
+    private val players = mutableMapOf<String, Player>()
     private lateinit var startButton: Button
     private lateinit var playerName: EditText
     private lateinit var image: ImageView
@@ -43,88 +43,155 @@ class PlayerActivity : AppCompatActivity() {
         image.setImageResource(R.drawable.playing)
         winButton = findViewById(R.id.winnerButton)
 
+        startButton.setOnClickListener {
+            play(it)
+        }
+
+        winButton.setOnClickListener {
+            val name = playerName.text.toString()
+            if (name.isNotEmpty() && lastPlayerScore > 0) {
+                showWinners(name, lastPlayerScore)
+                winButton.isEnabled = true
+            } else {
+                Toast.makeText(this, "No completed game to show winners.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+
+        playerName.addTextChangedListener(object : TextWatcher {
+            override fun afterTextChanged(s: Editable?) {
+                checkPlayButtonState()
+            }
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+        })
+
+        checkPlayButtonState()
 
         mainActivityLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult()
         ) { result ->
             val name = playerName.text.toString()
             if (result.resultCode == RESULT_OK && name.isNotEmpty()) {
-                val score = result.data?.getIntExtra("score", 0) ?: 0
-                lastPlayerScore = score
-                playerAttempts[name] = 0 // Reset attempts for successful players
+                val score = result.data?.getIntExtra("score", 0) ?: 0 // Get the correct score
+                lastPlayerScore = score // Save it to lastPlayerScore
+                val player = players[name] ?: Player(name)
+                player.score = score // Update the player's score
+                player.backPressedCount = 0
+                player.isRestricted = false
+                players[name] = player
                 Toast.makeText(this, "Game completed successfully! Score: $score", Toast.LENGTH_SHORT).show()
             } else if (name.isNotEmpty()) {
-                playerAttempts[name] = (playerAttempts[name] ?: 0) + 1
+                val player = players[name] ?: Player(name)
+                player.backPressedCount++
+                players[name] = player
                 checkPlayButtonState()
             }
         }
 
-        startButton.setOnClickListener {
-            play()
-        }
-
-        winButton.setOnClickListener {
-            val name = playerName.text.toString()
-            if (name.isNotEmpty()) {
-                showWinners(name, lastPlayerScore)
-            } else {
-                Toast.makeText(this, "Please enter a player name first.", Toast.LENGTH_SHORT).show()
-            }
-        }
 
         if (intent.getBooleanExtra("resetPlayButton", false)) {
-            playerAttempts.clear()
+            players.clear()
         }
-
-        checkPlayButtonState()
     }
 
-    private fun play() {
+    override fun onBackPressed() {
         val name = playerName.text.toString()
         if (name.isNotEmpty()) {
-            val attempts = playerAttempts[name] ?: 0
-            if (attempts < 3) {
-                val intent = Intent(this, MainActivity::class.java)
-                intent.putExtra("name", name)
-                mainActivityLauncher.launch(intent)
-            } else {
+            val player = players[name] ?: Player(name)
+            player.backPressedCount++
+            players[name] = player
+            checkPlayButtonState()
+        }
+        super.onBackPressed()
+    }
+
+    private fun checkPlayButtonState() {
+        val name = playerName.text.toString().trim()
+        if (name.isNotEmpty()) {
+            val player = players[name] ?: Player(name)
+            val attempts = player.backPressedCount
+
+            startButton.isEnabled = attempts < 3
+
+            if (attempts >= 3) {
+                player.isRestricted = true
+                startButton.isEnabled = false
                 Toast.makeText(
                     this,
-                    "Player $name has exceeded the maximum number of trials.",
+                    "Player $name has pressed back too many times. They cannot play again.",
                     Toast.LENGTH_LONG
                 ).show()
             }
         } else {
-            Toast.makeText(this, "Please enter your name", Toast.LENGTH_SHORT).show()
+            startButton.isEnabled = false
+            Toast.makeText(this, "Please enter a valid player name.", Toast.LENGTH_SHORT).show()
         }
     }
 
-    @SuppressLint("CommitPrefEdits")
+
+    fun play(view: View) {
+        val name = playerName.text.toString().trim()
+        if (name.isEmpty()) {
+            Toast.makeText(this, "Please enter your name", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val player = players.getOrPut(name) { Player(name) }
+
+        if (player.isRestricted) {
+            val otherPlayersPlayed = players.values.count { it.score > 0 }
+            if (otherPlayersPlayed < 2) {
+                Toast.makeText(
+                    this,
+                    "Player $name is restricted. Two different players must play first.",
+                    Toast.LENGTH_LONG
+                ).show()
+                return
+            }
+            player.isRestricted = false
+            winButton.isEnabled=true
+        }
+
+
+        if (player.backPressedCount >= 3) {
+            player.isRestricted = true
+            winButton.isEnabled=false
+            Toast.makeText(
+                this,
+                "Player $name is restricted after 3 back presses.",
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val intent = Intent(this, MainActivity::class.java)
+        intent.putExtra("player", player)
+        mainActivityLauncher.launch(intent)
+    }
+
     private fun showWinners(name: String, score: Int) {
-        val sharedPreferences = getSharedPreferences("GameWinners", Context.MODE_PRIVATE)
+        val sharedPreferences = getSharedPreferences("GameWinners", MODE_PRIVATE)
         val editor = sharedPreferences.edit()
         val winnersJson = sharedPreferences.getString("winners", "[]")
         var winnersArray = JSONArray(winnersJson)
 
-        if (winnersArray.length() > 0) {
-            val highestScore = winnersArray.getJSONObject(0).getInt("score")
-            if (score >= highestScore) {
-                if (score > highestScore) {
-                    winnersArray = JSONArray()
-                }
-                val newWinner = JSONObject().apply {
-                    put("name", name)
-                    put("score", score)
-                }
-                winnersArray.put(newWinner)
-                }
-                val newWinner = JSONObject().apply {
-                    put("name", name)
-                    put("score", score)
-                }
-                winnersArray.put(newWinner)
-
+        val highestScore = if (winnersArray.length() > 0) {
+            var maxScore = 0
+            for (i in 0 until winnersArray.length()) {
+                val winner = winnersArray.getJSONObject(i)
+                maxScore = maxOf(maxScore, winner.getInt("score"))
+            }
+            maxScore
         } else {
+            -1
+        }
+
+        if (score >= highestScore) {
+            if (score > highestScore) {
+                winnersArray = JSONArray()
+            }
             val newWinner = JSONObject().apply {
                 put("name", name)
                 put("score", score)
@@ -137,24 +204,6 @@ class PlayerActivity : AppCompatActivity() {
 
         val intent = Intent(this, WinnerActivity::class.java)
         startActivity(intent)
-    }
-
-    override fun onResume() {
-        super.onResume()
-        checkPlayButtonState()
-    }
-
-    private fun checkPlayButtonState() {
-        val name = playerName.text.toString().trim()
-        val attempts = playerAttempts[name] ?: 0
-        startButton.isEnabled = attempts < 3
-        if (name.isNotEmpty() && attempts >= 3) {
-            Toast.makeText(
-                this,
-                "Player $name has exceeded the maximum number of trials. Please try a different player.",
-                Toast.LENGTH_LONG
-            ).show()
-        }
     }
 }
 

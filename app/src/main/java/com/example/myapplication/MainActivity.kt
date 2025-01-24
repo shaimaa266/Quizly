@@ -20,10 +20,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : AppCompatActivity() {
-    companion object {
-        val playersList = mutableListOf<players>()
-        var uniquePlayerCount = 0
-    }
 
     private lateinit var nameText: TextView
     private lateinit var questionText: TextView
@@ -31,39 +27,30 @@ class MainActivity : AppCompatActivity() {
     private lateinit var startButton: Button
     private lateinit var nextButton: Button
     private lateinit var questionCount: TextView
-    private  lateinit var image: ImageView
+    private lateinit var image: ImageView
 
     private var score = 0
     private var index = 0
     private var questions = arrayOf(
-        questions("Egypt", "Cairo"),
-        questions("France", "Paris"),
-        questions("USA", "Washington"),
-        questions("Morocco", "Rabat"),
-       questions("South Korea", "Seoul"),
-      /*  questions("Germany", "Berlin"),
-        questions("Japan", "Tokyo"),
-        questions("Brazil", "Brasília"),
-        questions("India", "New Delhi"),
-        questions("Russia", "Moscow"),
-        questions("Italy", "Rome"),
-        questions("Spain", "Madrid"),
-        questions("Pakistan", "Islamabad"),
-        questions("Greece", "Athens"),
-        questions("Turkey", "Ankara")*/
+        Questions("Egypt", "Cairo"),
+        Questions("France", "Paris"),
+        Questions("USA", "Washington"),
+        Questions("Morocco", "Rabat"),
+        Questions("South Korea", "Seoul"),
     )
 
     private var items = mutableListOf(
         "please select",
-        "Cairo", "Baghdad", "Beijing", "Washington", "Toronto",
+        "Cairo", "Baghdad", "Beijing", "Washington",
         "Paris", "Damascus", "London", "Rabat", "Islamabad",
-        "Ryad", "Tokyo", "Berlin", "Seoul", "Ottawa", "Bern",
-        "Cape Town","Brasília", "New Delhi", "Moscow", "Rome", "Madrid"
+        "Ryad", "Tokyo", "Seoul",
+        "Brasília", "New Delhi", "Moscow", "Rome", "Madrid"
     )
 
     private val itemsMaster = items.toMutableList()
     private lateinit var countryAdapter: ArrayAdapter<String>
     private var player: MediaPlayer? = null
+    private lateinit var currentPlayer: Player
 
     @SuppressLint("MissingInflatedId", "SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -75,19 +62,27 @@ class MainActivity : AppCompatActivity() {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
         }
+
         nameText = findViewById(R.id.textName)
         questionText = findViewById(R.id.questionView)
         answerText = findViewById(R.id.spinner)
         startButton = findViewById(R.id.startButton)
         nextButton = findViewById(R.id.nextButton)
         questionCount = findViewById(R.id.numText)
-        image=findViewById(R.id.brainImage)
+        image = findViewById(R.id.brainImage)
         image.setImageResource(R.drawable.thinking)
+
+        answerText.visibility = View.GONE
+        nextButton.isEnabled = false
         countryAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, items)
         answerText.adapter = countryAdapter
 
-        val name = intent.getStringExtra("name")
-        nameText.text = "$name is playing.."
+
+        currentPlayer = intent.getSerializableExtra("player") as? Player ?: Player("Unknown",-0,false,-1)
+
+
+        nameText.text = "${currentPlayer.name} is playing.."
+
         startButton.setOnClickListener { start(it) }
         nextButton.setOnClickListener { next(it) }
     }
@@ -106,19 +101,12 @@ class MainActivity : AppCompatActivity() {
         questions.shuffle()
         questionText.text = "What is the capital of ${questions[index].country}?"
         questionCount.text = "Question ${index + 1} of ${questions.size}"
+        answerText.visibility = View.VISIBLE
         nextButton.isEnabled = true
         answerText.isEnabled = true
         answerText.setSelection(0)
     }
-    override fun onBackPressed() {
-        super.onBackPressed()
-
-        setResult(RESULT_CANCELED)
-    }
-
-
     @SuppressLint("SetTextI18n")
-
     private fun next(view: View) {
         val answer = answerText.selectedItem.toString()
         if (answerText.selectedItemPosition == 0) {
@@ -126,23 +114,21 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (answer.equals(questions[index].capital, ignoreCase = true)) {
-            score++
+            score++ // Increment the score if the answer is correct
+            items.remove(answer)
         }
         index++
         if (index < questions.size) {
             questionText.text = "What is the capital of ${questions[index].country}?"
             questionCount.text = "Question ${index + 1} of ${questions.size}"
         } else {
-            // Game finished
-            saveWinnerToPreferences()
+            saveWinnerToPreferences() // Save the winner's data
 
-            val name = intent.getStringExtra("name") ?: "Unknown"
-
-            // Start WinnerActivity and pass name and score
-            val intent = Intent(this, WinnerActivity::class.java)
-            intent.putExtra("name", name)
-            intent.putExtra("score", score)
-            startActivity(intent)
+            // Pass the correct score back to PlayerActivity
+            val resultIntent = Intent()
+            resultIntent.putExtra("score", score) // Correctly pass the final score
+            setResult(RESULT_OK, resultIntent)
+            finish() // Close MainActivity and return to PlayerActivity
         }
         items.subList(1, items.size).shuffle()
         countryAdapter.notifyDataSetChanged()
@@ -151,29 +137,50 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun saveWinnerToPreferences() {
+        if (score == 0) return // Do not save players with 0 score
+
         val sharedPreferences = getSharedPreferences("GameWinners", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
-
         val winnersJson = sharedPreferences.getString("winners", "[]")
         val winnersArray = JSONArray(winnersJson)
 
-        val name = intent.getStringExtra("name") ?: "Unknown"
-
-        val newWinner = JSONObject().apply {
-            put("name", name)
-            put("score", score)
+        // Avoid duplicate entries for the same player
+        val existingWinner = (0 until winnersArray.length()).any { i ->
+            winnersArray.getJSONObject(i).getString("name") == currentPlayer.name
         }
-        winnersArray.put(newWinner)
+
+        if (!existingWinner) {
+            val newWinner = JSONObject().apply {
+                put("name", currentPlayer.name)
+                put("score", score) // Use the correct score variable
+            }
+            winnersArray.put(newWinner)
+        }
 
         editor.putString("winners", winnersArray.toString())
         editor.apply()
 
-        Toast.makeText(this, "Saved $name with score $score to winners!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "Saved ${currentPlayer.name} with score $score!", Toast.LENGTH_SHORT).show()
     }
 
 
-    private fun resetItems() {
 
+    override fun onBackPressed() {
+        super.onBackPressed()
+
+        currentPlayer.backPressedCount++
+
+        if (currentPlayer.backPressedCount >= 3) {
+            currentPlayer.isRestricted = true
+            Toast.makeText(
+                this,
+                "Player ${currentPlayer.name} is restricted after 3 back presses.",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun resetItems() {
         items.clear()
         items.addAll(itemsMaster)
         items.subList(1, items.size).shuffle()

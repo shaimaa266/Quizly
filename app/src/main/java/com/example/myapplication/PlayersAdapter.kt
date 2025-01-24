@@ -1,11 +1,12 @@
 package com.example.myapplication
 
+import android.annotation.SuppressLint
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
-class PlayersAdapter(private val playersList: List<players>) :
+class PlayersAdapter(private val playersList: List<Player>) :
     RecyclerView.Adapter<PlayersAdapter.PlayerViewHolder>() {
 
     class PlayerViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -19,6 +20,7 @@ class PlayersAdapter(private val playersList: List<players>) :
         return PlayerViewHolder(view)
     }
 
+    @SuppressLint("SetTextI18n")
     override fun onBindViewHolder(holder: PlayerViewHolder, position: Int) {
         val player = playersList[position]
         holder.playerName.text = player.name
