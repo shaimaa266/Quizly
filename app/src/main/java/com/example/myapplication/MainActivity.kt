@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.media.MediaPlayer
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -29,7 +28,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nextButton: Button
     private lateinit var questionCount: TextView
     private lateinit var image: ImageView
-
     private var score = 0
     private var index = 0
     private var questions = arrayOf(
@@ -39,7 +37,6 @@ class MainActivity : AppCompatActivity() {
         Questions("Morocco", "Rabat"),
         Questions("South Korea", "Seoul"),
     )
-
     private var items = mutableListOf(
         "please select",
         "Cairo", "Baghdad", "Beijing", "Washington",
@@ -47,12 +44,10 @@ class MainActivity : AppCompatActivity() {
         "Ryad", "Tokyo", "Seoul",
         "Brasília", "New Delhi", "Moscow", "Rome", "Madrid"
     )
-
     private val itemsMaster = items.toMutableList()
     private lateinit var countryAdapter: ArrayAdapter<String>
     private var player: MediaPlayer? = null
     private lateinit var currentPlayer: Player
-
     @SuppressLint("MissingInflatedId", "SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -79,7 +74,7 @@ class MainActivity : AppCompatActivity() {
         answerText.adapter = countryAdapter
 
 
-        currentPlayer = intent.getSerializableExtra("player") as? Player ?: Player("Unknown",-0,false,-1)
+        currentPlayer = intent.getSerializableExtra("player") as Player
 
 
         nameText.text = "${currentPlayer.name} is playing.."
@@ -87,12 +82,6 @@ class MainActivity : AppCompatActivity() {
         startButton.setOnClickListener { start(it) }
         nextButton.setOnClickListener { next(it) }
     }
-
-    override fun onDestroy() {
-        player?.release()
-        super.onDestroy()
-    }
-
     @SuppressLint("SetTextI18n")
     private fun start(view: View) {
         player?.stop()
@@ -115,7 +104,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (answer.equals(questions[index].capital, ignoreCase = true)) {
-            score++ // Increment the score if the answer is correct
+            score++
             items.remove(answer)
         }
         index++
@@ -123,25 +112,20 @@ class MainActivity : AppCompatActivity() {
             questionText.text = "What is the capital of ${questions[index].country}?"
             questionCount.text = "Question ${index + 1} of ${questions.size}"
         } else {
-            saveWinnerToPreferences() // Save the winner's data
+            saveWinnerToPreferences()
 
-            // Pass the correct score back to PlayerActivity
             val resultIntent = Intent()
-            resultIntent.putExtra("score", score) // Correctly pass the final score
+            resultIntent.putExtra("score", score)
             setResult(RESULT_OK, resultIntent)
-            finish() // Close MainActivity and return to PlayerActivity
+            finish()
         }
         items.subList(1, items.size).shuffle()
         countryAdapter.notifyDataSetChanged()
         answerText.setSelection(0)
     }
-
-
     private var hasSavedScore = false
-
     private fun saveWinnerToPreferences() {
-        if (score == 0 || hasSavedScore) return// Prevent saving twice in the same session
-
+        if (score == 0 || hasSavedScore) return
         val sharedPreferences = getSharedPreferences("GameWinners", Context.MODE_PRIVATE)
         val editor = sharedPreferences.edit()
         val winnersJson = sharedPreferences.getString("winners", "[]")
@@ -161,11 +145,10 @@ class MainActivity : AppCompatActivity() {
             val existingWinner = winnersArray.getJSONObject(existingWinnerIndex)
             val existingScore = existingWinner.getInt("score")
             if (score > existingScore) {
-                existingWinner.put("score", score) // Update the score
+                existingWinner.put("score", score)
                 winnersArray.put(existingWinnerIndex, existingWinner)
             }
         } else {
-            // Add a new winner if they don't exist
             val newWinner = JSONObject().apply {
                 put("name", currentPlayer.name)
                 put("score", score)
@@ -176,16 +159,11 @@ class MainActivity : AppCompatActivity() {
         editor.putString("winners", winnersArray.toString())
         editor.apply()
 
-        hasSavedScore = true // Mark the score as saved
+        hasSavedScore = true
         Toast.makeText(this, "Saved ${currentPlayer.name} with score $score!", Toast.LENGTH_SHORT).show()
     }
-
-
-
-
-
     override fun onBackPressed() {
-        super.onBackPressed()
+
 
         currentPlayer.backPressedCount++
 
@@ -197,13 +175,17 @@ class MainActivity : AppCompatActivity() {
                 Toast.LENGTH_SHORT
             ).show()
         }
+        super.onBackPressed()
     }
-
     private fun resetItems() {
         items.clear()
         items.addAll(itemsMaster)
         items.subList(1, items.size).shuffle()
         countryAdapter.notifyDataSetChanged()
+    }
+    override fun onDestroy() {
+        player?.release()
+        super.onDestroy()
     }
 }
 

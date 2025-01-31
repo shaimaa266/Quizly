@@ -4,4 +4,7 @@
     <string name="start">Start</string>
     <string name="player_name">Player Name</string>
     <string name="score_0">Score: 0</string>
+    <string name="search">search</string>
+    <string name="enter_player_name">Enter player name</string>
+    <string name="winners">Winners</string>
 </resources>
